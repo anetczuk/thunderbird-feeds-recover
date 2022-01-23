@@ -30,26 +30,27 @@ Other files:
 
 ## `feeds.json` structure
 
-```[{'destFolder': 'mailbox://nobody@<thunderbird_feed_path>',
-  'lastModified': 'Sat, 22 Jan 2022 00:34:48 GMT',
-  'link': '<feed_website_url>',
-  'options': {'category': {'enabled': False,
-                           'prefix': '',
-                           'prefixEnabled': False},
-              'updates': {'enabled': True,
-                          'lastDownloadTime': None,
-                          'lastUpdateTime': <last_update_timestamp>,
-                          'updateBase': '',
-                          'updateFrequency': '',
-                          'updateMinutes': 100,
-                          'updatePeriod': '',
-                          'updateUnits': 'min'},
-              'version': 2},
-  'quickMode': False,
-  'title': '<feed_title>',
-  'url': '<feed_url>'}
-  ...
-  ]
+```
+[{'destFolder': 'mailbox://nobody@<thunderbird_feed_path>',
+'lastModified': 'Sat, 22 Jan 2022 00:34:48 GMT',
+'link': '<feed_website_url>',
+'options': {'category': {'enabled': False,
+                         'prefix': '',
+                         'prefixEnabled': False},
+            'updates': {'enabled': True,
+                        'lastDownloadTime': None,
+                        'lastUpdateTime': <last_update_timestamp>,
+                        'updateBase': '',
+                        'updateFrequency': '',
+                        'updateMinutes': 100,
+                        'updatePeriod': '',
+                        'updateUnits': 'min'},
+            'version': 2},
+'quickMode': False,
+'title': '<feed_title>',
+'url': '<feed_url>'}
+...
+]
 
 ```
 
