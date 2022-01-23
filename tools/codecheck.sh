@@ -53,10 +53,10 @@ fi
 echo "flake8 -- no warnings found"
 
 
-# src_subdirs=$(echo $src_dir/*/)
+src_subdirs=$(echo $src_dir/*/)
 
 echo "running pylint"
-pylint --rcfile=$SCRIPT_DIR/pylint3.config $src_dir
+pylint --rcfile=$SCRIPT_DIR/pylint3.config $src_subdirs
 # pylint --rcfile=$SCRIPT_DIR/pylint3.config $src_subdirs $src_dir/*.py
 
 exit_code=$?
