@@ -6,7 +6,7 @@ Have You lost Your feeds? Did You delete ```feeds.json``` by accident?
 Are You victim of [Bug 1701414](https://bugzilla.mozilla.org/show_bug.cgi?id=1701414)? 
 This program will restore Your belowed feeds configuration!
 
-Recovery is especially dedicated for modern Thunderbird users (around version 78).
+Recovery is especially dedicated for modern Thunderbird users (around TB version 78).
 
 
 ## Running
