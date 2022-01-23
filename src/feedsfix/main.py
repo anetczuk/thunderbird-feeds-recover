@@ -30,21 +30,22 @@ import pprint
 import datetime
 
 import argparse
-from _collections import defaultdict
-import json
-
 import glob
+import configparser
+import json
+import feedparser
+
 import requests
 import requests_file
-import feedparser
-import configparser
+
+from _collections import defaultdict
 
 
 script_dir = os.path.dirname(__file__)
 
 
-logging.basicConfig(stream = sys.stdout, 
-                    level = logging.INFO)
+logging.basicConfig(stream=sys.stdout,
+                    level=logging.INFO)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ def deduce_profile_path():
 
     config = configparser.ConfigParser()
     config.read( profiles_config_path )
-    
+
     for key in config:
         if "Profile" not in key:
             ## not profile section -- skip
@@ -100,6 +101,7 @@ def deduce_profile_path():
 
     return None
 
+
 def get_pane_path( file_path, feeds_path ):
     relPath = os.path.relpath( file_path, feeds_path )
     subPath = FEEDS_DIR_NAME + "/" + relPath
@@ -112,7 +114,7 @@ def find_message_folder( message_id, feeds_path ):
     pathsList = glob.glob( feeds_path + "/**", recursive=True )
     retList = set()
     for fname in pathsList:
-        if os.path.isfile(fname) == False:    # make sure it's a file, not a directory entry
+        if os.path.isfile(fname) is False:    # make sure it's a file, not a directory entry
             ## directory -- skip
             continue
         if fname.endswith('.msf') is False:
@@ -130,19 +132,20 @@ def find_message_folder( message_id, feeds_path ):
 ## 'update_timestamp' is given in milliseconds
 def create_feed_item( dest_panel_folder, feed_url, feed_title, feed_website_link, update_timestamp ):
     lastDate = datetime.datetime.utcfromtimestamp( update_timestamp / 1000 )
-    _LOGGER.info( "creating feed item: %s %s %s %s %s", dest_panel_folder, feed_url, feed_title, feed_website_link, lastDate )
-    
+    _LOGGER.info( "creating feed item: %s %s %s %s %s",
+                  dest_panel_folder, feed_url, feed_title, feed_website_link, lastDate )
+
     lastModStr = lastDate.strftime("%a, %d %b %Y %H:%M:%S GMT")
-    
+
     ## encode space character
     dest_folder = dest_panel_folder.replace( " ", "%20" )
-    
+
     ## corrupts names containing phrases like "C++"
     ##dest_folder = urllib.parse.quote( dest_panel_folder )
 
     content = {'destFolder': f'mailbox://nobody@{dest_folder}',
                'lastModified': lastModStr,
-#                'lastModified': 'Sat, 22 Jan 2022 00:34:48 GMT',
+               # 'lastModified': 'Sat, 22 Jan 2022 00:34:48 GMT',
                'link': f'{feed_website_link}',
                'options': {'category': {'enabled': False,
                                         'prefix': '',
@@ -162,23 +165,14 @@ def create_feed_item( dest_panel_folder, feed_url, feed_title, feed_website_link
     return content
 
 
-def rebuild_feeds( feeditems_path ):
-    _LOGGER.info( "reading feeditems: %s", feeditems_path )
-    corrupt_content = read_file( feeditems_path )
-
-    json_data = json.loads( corrupt_content, strict=False )
-
-    feedsLastTime = 0
-
-    ## feeditems_dict = { "feed_url": { "messages":[message_id], "lastSeenTime": 0 } }
+## returns { "feed_url": { "messages":[message_id], "lastSeenTime": 0 } }
+def extract_feeds_dict( feeditems_data ):
+    # pylint: disable=unnecessary-lambda
     feeditems_dict = defaultdict( lambda: dict() )
-
-    ## parse feeditems file -- grab feed urls and message ids
-    for message_id in json_data.keys():
-        val = json_data[ message_id ]
+    for message_id in feeditems_data.keys():
+        val = feeditems_data[ message_id ]
         feedList = val['feedURLs']
         lastSeenTime = val['lastSeenTime']
-        feedsLastTime = max( feedsLastTime, lastSeenTime )
 
         for feed in feedList:
             feeditem = feeditems_dict[ feed ]
@@ -187,15 +181,10 @@ def rebuild_feeds( feeditems_path ):
 
             currTime = feeditem.get( "lastSeenTime", 0 )
             feeditem["lastSeenTime"] = max( lastSeenTime, currTime )
-        
-    index = 1
-    for feed in feeditems_dict:
-        _LOGGER.info( "found feed: %s", feed )
-        index += 1
-        
-    feeds_path = os.path.dirname( feeditems_path )
+    return feeditems_dict
 
-    ## create feeds
+
+def generate_feeds_list( feeditems_dict, feeds_path ):
     feedsList = []
     for feedUrl in feeditems_dict:
         feeditem = feeditems_dict[ feedUrl ]
@@ -207,9 +196,10 @@ def rebuild_feeds( feeditems_path ):
                 feed_dirs.update( message_files )
 
         if len( feed_dirs ) != 1:
-            _LOGGER.warning( "unable to determine directory for message: %s %s %s", feedUrl, len( feed_dirs ), feed_dirs )
+            _LOGGER.warning( "unable to determine directory for message: %s %s %s",
+                             feedUrl, len( feed_dirs ), feed_dirs )
             continue
-        
+
         feedContent = read_url( feedUrl )
         parsedDict = feedparser.parse( feedContent )
         if parsedDict.get('bozo', False):
@@ -221,38 +211,63 @@ def rebuild_feeds( feeditems_path ):
         feedTitle    = parsedFeed['title']
         feedLink     = parsedFeed['link']
         lastSeenTime = feeditem["lastSeenTime"]
-        
+
         feed_item = create_feed_item( list(feed_dirs)[0], feedUrl, feedTitle, feedLink, lastSeenTime )
         feedsList.append( feed_item )
+    return feedsList
+
+
+def rebuild_feeds( feeditems_path ):
+    _LOGGER.info( "reading feeditems: %s", feeditems_path )
+    corrupt_content = read_file( feeditems_path )
+
+    feeditems_data = json.loads( corrupt_content, strict=False )
+
+    ## parse feeditems file -- grab feed urls and message ids
+    feeditems_dict = extract_feeds_dict( feeditems_data )
+
+    feedsLastTime = 0
+    index = 1
+    for feed in feeditems_dict:
+        item = feeditems_dict[ feed ]
+        lastSeenTime = item[ "lastSeenTime" ]
+        feedsLastTime = max( feedsLastTime, lastSeenTime )
+        _LOGGER.info( "found feed: %s", feed )
+        index += 1
+
+    feeds_path = os.path.dirname( feeditems_path )
+
+    ## create feeds
+    feedsList = generate_feeds_list( feeditems_dict, feeds_path )
 
 #     pprint.pprint( feedsList )
 
     ## output json data
     feed_out_path = os.path.join( feeds_path, "feeds.json.rebuild" )
-    with open(feed_out_path, 'w', encoding ='utf8') as json_file:
-        json.dump( feedsList, json_file, ensure_ascii = True )
+    with open(feed_out_path, 'w', encoding='utf8') as out_file:
+        json.dump( feedsList, out_file, ensure_ascii=True )
 
     ## output pretty data
     feed_pretty_out_path = feed_out_path + ".pretty"
-    with open(feed_pretty_out_path, 'w', encoding ='utf8') as json_file:
-        pprint.pprint( feedsList, stream=json_file )
+    with open(feed_pretty_out_path, 'w', encoding='utf8') as out_file:
+        pprint.pprint( feedsList, stream=out_file )
 
     lastTime = int(lastSeenTime / 1000 )
     lastDate = datetime.datetime.utcfromtimestamp( lastTime )
     _LOGGER.info( "last seen timestamp: %s", lastSeenTime )
     _LOGGER.info( "last seen date: %s", lastDate )
-    
+
     _LOGGER.info( "rebuild feeds to: %s", feed_out_path )
-    
+
     return 0
-    
+
 
 def main( args=None ):
     parser = argparse.ArgumentParser(description='Feeds recovery')
     parser.add_argument('--feeditems_path', '-fip', action='store', default=None, help='Path to feeditems.json' )
-    
+
     args = parser.parse_args()
-    
+
     feeditems_path = args.feeditems_path
     if feeditems_path is None:
         _LOGGER.info( "'feeditems_path' not passed, deducing the path" )
